@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Wallet, User, Lock, Eye, EyeOff, Facebook, Apple, Chrome } from 'lucide-react';
+import { api } from '../api';
 
 interface LoginProps {
   onLogin: () => void;
@@ -9,26 +10,53 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
     if (username && password) {
-      onLogin(); // Mock login logic
+      try {
+        const data = await api.login(username, password); // username is treated as email based on backend, but UI says username. Backend expects email. I should probably change UI to say email or just pass username as email if it's an email format. Let's assume username=email for now or update UI placeholder.
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        onLogin();
+      } catch (err: any) {
+        setError(err.message);
+      }
     }
   };
 
+  const handleRegister = async () => {
+    if (username && password) {
+      try {
+        await api.register(username, password);
+        // Auto login after register
+        const data = await api.login(username, password);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        onLogin();
+      } catch (err: any) {
+        setError(err.message);
+      }
+    } else {
+      setError("Username and password required for registration");
+    }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-6 py-10">
-      
+
       {/* Main Glass Card */}
       <div className="glass-panel w-full max-w-sm p-8 rounded-3xl flex flex-col items-center animate-fade-in relative overflow-hidden">
-        
+
         {/* Decorative gloss effect */}
         <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-20 rounded-full blur-2xl pointer-events-none"></div>
 
         {/* Header */}
         <h1 className="text-3xl font-bold text-gray-800 mb-6 tracking-tight">Welcome Back!</h1>
-        
+
         {/* Icon */}
         <div className="mb-8 p-4 rounded-full bg-white/20 glass shadow-lg">
           <Wallet size={48} className="text-emerald-500" strokeWidth={1.5} />
@@ -36,15 +64,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
-          
+
           {/* Username Input */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <User size={20} className="text-gray-500 group-focus-within:text-emerald-500 transition-colors" />
             </div>
             <input
-              type="text"
-              placeholder="Username"
+              type="email"
+              placeholder="Email"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-white/40 border border-white/40 rounded-xl text-gray-800 placeholder-gray-500 focus:bg-white/60 focus:ring-2 focus:ring-emerald-400/50 transition-all shadow-sm"
@@ -53,7 +81,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           {/* Password Input */}
           <div className="relative group">
-             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Lock size={20} className="text-gray-500 group-focus-within:text-emerald-500 transition-colors" />
             </div>
             <input
@@ -63,7 +91,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-12 pr-12 py-3 bg-white/40 border border-white/40 rounded-xl text-gray-800 placeholder-gray-500 focus:bg-white/60 focus:ring-2 focus:ring-emerald-400/50 transition-all shadow-sm"
             />
-           
+
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -82,33 +110,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </button>
         </form>
 
+        {/* Error Message */}
+        {error && <div className="text-red-500 text-sm mb-4 bg-red-100 p-2 rounded text-center">{error}</div>}
+
         {/* Links */}
         <div className="flex justify-between w-full mt-4 text-sm text-gray-600">
           <a href="#" className="hover:text-gray-800 hover:underline">Forgot Password?</a>
-          <a href="#" className="hover:text-gray-800 hover:underline">Create Account</a>
+          <button type="button" onClick={handleRegister} className="hover:text-gray-800 hover:underline">Create Account</button>
         </div>
 
         {/* Social Login */}
         <div className="mt-8 w-full">
           <div className="relative flex py-2 items-center">
-             <div className="flex-grow border-t border-gray-400/30"></div>
-             <span className="flex-shrink-0 mx-4 text-gray-500 text-xs">OR CONTINUE WITH</span>
-             <div className="flex-grow border-t border-gray-400/30"></div>
+            <div className="flex-grow border-t border-gray-400/30"></div>
+            <span className="flex-shrink-0 mx-4 text-gray-500 text-xs">OR CONTINUE WITH</span>
+            <div className="flex-grow border-t border-gray-400/30"></div>
           </div>
-          
+
           <div className="flex justify-center gap-6 mt-4">
-             {/* Google */}
-             <button className="p-3 bg-white/40 border border-white/50 rounded-full hover:bg-white/60 transition-colors shadow-sm text-red-500">
-                <Chrome size={24} />
-             </button>
-             {/* Facebook */}
-             <button className="p-3 bg-white/40 border border-white/50 rounded-full hover:bg-white/60 transition-colors shadow-sm text-blue-600">
-                <Facebook size={24} />
-             </button>
-             {/* Apple */}
-             <button className="p-3 bg-white/40 border border-white/50 rounded-full hover:bg-white/60 transition-colors shadow-sm text-gray-900">
-                <Apple size={24} />
-             </button>
+            {/* Google */}
+            <button className="p-3 bg-white/40 border border-white/50 rounded-full hover:bg-white/60 transition-colors shadow-sm text-red-500">
+              <Chrome size={24} />
+            </button>
+            {/* Facebook */}
+            <button className="p-3 bg-white/40 border border-white/50 rounded-full hover:bg-white/60 transition-colors shadow-sm text-blue-600">
+              <Facebook size={24} />
+            </button>
+            {/* Apple */}
+            <button className="p-3 bg-white/40 border border-white/50 rounded-full hover:bg-white/60 transition-colors shadow-sm text-gray-900">
+              <Apple size={24} />
+            </button>
           </div>
         </div>
 

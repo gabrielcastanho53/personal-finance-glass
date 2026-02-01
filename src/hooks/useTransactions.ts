@@ -1,7 +1,9 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
+import { api } from '../api';
 
 export interface Transaction {
-    id: string;
+    id: number;
     description: string;
     category: string;
     amount: number;
@@ -10,19 +12,70 @@ export interface Transaction {
     icon?: string;
 }
 
-const INITIAL_TRANSACTIONS: Transaction[] = [
-    { id: '1', description: 'Uber (Transport)', category: 'Transport', amount: 24.50, type: 'expense', date: '2026-01-31' },
-    { id: '2', description: 'Salary', category: 'Salary', amount: 4000.00, type: 'income', date: '2026-01-30' },
-    { id: '3', description: 'Restaurant', category: 'Food', amount: 120.00, type: 'expense', date: '2026-01-29' },
-    { id: '4', description: 'Netflix', category: 'Entertainment', amount: 39.90, type: 'expense', date: '2026-01-28' },
-];
-
 export const useTransactions = () => {
-    const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [currentDate, setCurrentDate] = useState(new Date());
 
-    const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-        const newTx = { ...transaction, id: Math.random().toString(36).substr(2, 9) };
-        setTransactions([newTx, ...transactions]);
+    const [user, setUser] = useState<{ id: number; email: string; avatarUrl?: string } | null>(null);
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        }
+    }, []);
+
+    const fetchTransactions = async () => {
+        try {
+            const data = await api.getTransactions(currentDate.getMonth() + 1, currentDate.getFullYear());
+            setTransactions(data);
+        } catch (error) {
+            console.error("Failed to fetch transactions:", error);
+        }
+    };
+
+    useEffect(() => {
+        fetchTransactions();
+    }, [currentDate]);
+
+    const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+        try {
+            const newTx = await api.addTransaction(transaction);
+            // Only add to list if it belongs to current month view
+            const txDate = new Date(newTx.date);
+            if (txDate.getMonth() === currentDate.getMonth() && txDate.getFullYear() === currentDate.getFullYear()) {
+                setTransactions([newTx, ...transactions]);
+            }
+        } catch (error) {
+            console.error("Failed to add transaction:", error);
+        }
+    };
+
+    const deleteTransaction = async (id: number) => {
+        try {
+            await api.deleteTransaction(id);
+            setTransactions(transactions.filter(tx => tx.id !== id));
+        } catch (error) {
+            console.error("Failed to delete transaction:", error);
+        }
+    };
+
+    const updateAvatar = async (avatar: string | File) => {
+        try {
+            const data = await api.updateProfile(avatar);
+            setUser(data.user);
+            localStorage.setItem('user', JSON.stringify(data.user));
+        } catch (error) {
+            console.error("Failed to update avatar:", error);
+        }
+    };
+
+    const nextMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    };
+
+    const prevMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
     };
 
     const totalBalance = transactions.reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
@@ -44,9 +97,15 @@ export const useTransactions = () => {
     return {
         transactions,
         addTransaction,
+        deleteTransaction,
+        updateAvatar,
+        user,
         totalBalance,
         totalIncome,
         totalExpense,
-        chartData
+        chartData,
+        currentDate,
+        nextMonth,
+        prevMonth
     };
 };
